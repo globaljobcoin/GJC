@@ -25,6 +25,10 @@ contract TokenVesting is Ownable {
     address[] accountKeys;
     mapping (address => Vesting[]) public vestingAccounts;
 
+    // events
+    event Vest(address indexed beneficiary, uint256 amount);
+    event VestingCreated(address indexed beneficiary, uint256 amount, uint256 vestingDate);
+
     // modifiers here
     modifier tokenSet() {
         require(address(token) != address(0));
@@ -52,6 +56,7 @@ contract TokenVesting is Ownable {
                 accountKeys.push(user);
             }
             vestingAccounts[user].push(Vesting(amount, vestingDate));
+            VestingCreated(user, amount, vestingDate);
         }
     }
 
@@ -89,6 +94,7 @@ contract TokenVesting is Ownable {
         require(availableAmount > 0);
         totalVestedAmount[msg.sender] = totalVestedAmount[msg.sender].add(availableAmount);
         token.transfer(msg.sender, availableAmount);
+        Vest(msg.sender, availableAmount);
     }
     // drain all eth for owner in an emergency situation
     function drain() onlyOwner {

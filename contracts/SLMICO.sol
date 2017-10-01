@@ -6,42 +6,22 @@ import './lifecycle/Pausable.sol';
 import './TokenVesting.sol';
 
 /**
-
- * Copyright 2017 Sunny Look Media LLC (SLM)
- * -----------------------------------------
- * We have used OpenZepplin with some adjustments for this project.
- 
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), 
- * to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, 
- * and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, 
- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
  * @title SLMICO
- * -------------
  * @dev SLMICO is a base contract for managing a token crowdsale.
- * The SLMICO has a start and end timestamp, where investors can make
- * token purchases. The crowdsale will assign them tokens based
- * on a token per ETH rate. The Funds collected are forwarded to a wallet
+ * SLMICO have a start and end timestamps, where investors can make
+ * token purchases and the crowdsale will assign them tokens based
+ * on a token per ETH rate. Funds collected are forwarded to a wallet
  * as they arrive.
- *
- * Timeline/Changes
- * ----------------
- * 15.09.2017 transferred from private to public project
  */
- 
- 
 contract SLMICO is Pausable{
   using SafeMath for uint256;
 
   //Gas/GWei
-  uint public minContribAmount = 0.01 ether;
-  uint public maxGasPrice = 50000000000;
+  uint constant public minContribAmount = 0.01 ether;
 
   // The token being sold
   SLMToken public token;
+  uint256 constant public tokenDecimals = 18;
 
   // The vesting contract
   TokenVesting public vesting;
@@ -60,21 +40,21 @@ contract SLMICO is Pausable{
   uint256 public weiRaised;
 
   // totalSupply
-  uint256 constant public totalSupply = 100000000 * (10 ** 18);
+  uint256 constant public totalSupply = 100000000 * (10 ** tokenDecimals);
   //pre sale cap
-  uint256 constant public preSaleCap = 10000000 * (10 ** 18);
+  uint256 constant public preSaleCap = 10000000 * (10 ** tokenDecimals);
   //sale cap
-  uint256 constant public initialICOCap = 60000000 * (10 ** 18);
+  uint256 constant public initialICOCap = 60000000 * (10 ** tokenDecimals);
   //founder share
-  uint256 constant public tokensForFounder = 10000000 * (10 ** 18);
+  uint256 constant public tokensForFounder = 10000000 * (10 ** tokenDecimals);
   //dev team share
-  uint256 constant public tokensForDevteam = 10000000 * (10 ** 18);
+  uint256 constant public tokensForDevteam = 10000000 * (10 ** tokenDecimals);
   //Partners share
-  uint256 constant public tokensForPartners = 5000000 * (10 ** 18);
+  uint256 constant public tokensForPartners = 5000000 * (10 ** tokenDecimals);
   //Charity share
-  uint256 constant public tokensForCharity = 3000000 * (10 ** 18);
+  uint256 constant public tokensForCharity = 3000000 * (10 ** tokenDecimals);
   //Bounty share
-  uint256 constant public tokensForBounty = 2000000 * (10 ** 18);
+  uint256 constant public tokensForBounty = 2000000 * (10 ** tokenDecimals);
     
   //Sold presale tokens
   uint256 public soldPreSaleTokens; 
@@ -84,7 +64,14 @@ contract SLMICO is Pausable{
   //Is calcluated as: initialICOCap + preSaleCap - soldPreSaleTokens
   uint256 public icoCap; 
   uint256 public icoSoldTokens; 
-  bool public icoEnded;
+  bool public icoEnded = false;
+
+  //Sale rates
+  uint256 constant public RATE_FOR_DAY12 = 420;
+  uint256 constant public RATE_FOR_DAY34 = 385;
+  uint256 constant public RATE_FOR_DAY5 = 359;
+  uint256 constant public RATE_NO_DISCOUNT = 350;
+
 
   /**
    * event for token purchase logging
@@ -97,6 +84,7 @@ contract SLMICO is Pausable{
 
 
   function SLMICO(address _multisignWallet) {
+    require(_multisignWallet != address(0));
     token = createTokenContract();
     //send all dao tokens to multiwallet
     uint256 tokensToDao = tokensForDevteam.add(tokensForPartners).add(tokensForBounty).add(tokensForCharity);
@@ -105,6 +93,8 @@ contract SLMICO is Pausable{
   }
 
   function createVestingForFounder(address founderAddress) onlyOwner(){
+    require(founderAddress != address(0));
+    //create only once
     require(address(vesting) == address(0));
     vesting = createTokenVestingContract(address(token));
     // create vesting schema for founders, total token amount is divided in 4 periods of 6 months each
@@ -117,12 +107,14 @@ contract SLMICO is Pausable{
   // Token related operations
   //
 
-  // creates the ERC20 token 
+  // creates the token to be sold. 
+  // override this method to have crowdsale of a specific mintable token.
   function createTokenContract() internal returns (SLMToken) {
     return new SLMToken();
   }
 
-  // creates the ERC20 token Vesting
+  // creates the token to be sold.
+  // override this method to have crowdsale of a specific mintable token.
   function createTokenVestingContract(address tokenAddress) internal returns (TokenVesting) {
     return new TokenVesting(tokenAddress);
   }
@@ -158,6 +150,7 @@ contract SLMICO is Pausable{
   // soldPreSaleTokens need to be set beforehand, and bigger than 0
   // the total amount to tranfered need to be less or equal to soldPreSaleTokens 
   function transferPreSaleTokens(uint256 tokens, address beneficiary) onlyOwner {
+    require(beneficiary != address(0));
     require(soldPreSaleTokens > 0);
     uint256 newSentPreSaleTokens = sentPreSaleTokens.add(tokens);
     require(newSentPreSaleTokens <= soldPreSaleTokens);
@@ -228,7 +221,7 @@ contract SLMICO is Pausable{
 
     if (newIcoSoldTokens > icoCap) {
         newIcoSoldTokens = icoCap;
-        tokens = icoCap - icoSoldTokens;
+        tokens = icoCap.sub(icoSoldTokens);
         uint256 newWeiAmount = tokens.div(rate);
         returnWeiAmount = weiAmount.sub(newWeiAmount);
         weiAmount = newWeiAmount;
@@ -265,7 +258,7 @@ contract SLMICO is Pausable{
   // @return true if the transaction can buy tokens
   function validPurchase() internal constant returns (bool) {
     bool withinPeriod = now >= startTime && now <= endTime;
-    bool nonZeroPurchase = msg.value != 0;
+    bool nonZeroPurchase = msg.value > 0;
     bool icoTokensAvailable = icoSoldTokens < icoCap;
     return !icoEnded && icoEnabled && withinPeriod && nonZeroPurchase && icoTokensAvailable;
   }
@@ -289,15 +282,16 @@ contract SLMICO is Pausable{
     require(now >= startTime);
     if (now < startTime.add(2 days)){
       // day 1, day 2
-      return 420;
+      return RATE_FOR_DAY12;
     }else if (now < startTime.add(4 days)){
       // day 3, day 4
-      return 385;
-    }else if (now < startTime.add(6 days)){
-      // day 5, day 6
-      return 359; 
+      return RATE_FOR_DAY34;
+    }else if (now < startTime.add(5 days)){
+      // day 5
+      return RATE_FOR_DAY5;
     }else if (now < endTime){
       // no discount
+      return RATE_NO_DISCOUNT;
       return 350;
     }
     return 0;
