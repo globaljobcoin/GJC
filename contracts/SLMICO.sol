@@ -185,8 +185,8 @@ contract SLMICO is Pausable{
     endTime = _endTime;
   }
 
-  // enable ICO, need to be true to actually start ico
-  // multisign wallet need to be set, because once ico started, invested funds is transfered to this address
+  // enable ICO, need to be true to start ico
+  // multisign wallet need to be set before ico starts
   // once ico is enabled, following parameters can not be changed anymore:
   // startTime, endTime, soldPreSaleTokens
   function enableICO() onlyOwner{
