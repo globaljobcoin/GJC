@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.15;
 
 
 import './ERC20Basic.sol';
@@ -21,6 +21,7 @@ contract BasicToken is ERC20Basic {
   */
   function transfer(address _to, uint256 _value) returns (bool) {
     require(_to != address(0));
+    require(_value >= 0);
 
     // SafeMath.sub will throw if there is not enough balance.
     balances[msg.sender] = balances[msg.sender].sub(_value);
