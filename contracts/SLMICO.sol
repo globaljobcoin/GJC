@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.15;
 
 import './SLMToken.sol';
 import './math/SafeMath.sol';
@@ -21,7 +21,7 @@ contract SLMICO is Pausable{
 
   // The token being sold
   SLMToken public token;
-  uint256 constant public tokenDecimals = 18;
+  uint8 constant public tokenDecimals = 18;
 
   // The vesting contract
   TokenVesting public vesting;
@@ -151,6 +151,7 @@ contract SLMICO is Pausable{
   // the total amount to tranfered need to be less or equal to soldPreSaleTokens 
   function transferPreSaleTokens(uint256 tokens, address beneficiary) onlyOwner {
     require(beneficiary != address(0));
+    require(tokens >= 0);
     require(soldPreSaleTokens > 0);
     uint256 newSentPreSaleTokens = sentPreSaleTokens.add(tokens);
     require(newSentPreSaleTokens <= soldPreSaleTokens);
@@ -258,9 +259,8 @@ contract SLMICO is Pausable{
   // @return true if the transaction can buy tokens
   function validPurchase() internal constant returns (bool) {
     bool withinPeriod = now >= startTime && now <= endTime;
-    bool nonZeroPurchase = msg.value > 0;
     bool icoTokensAvailable = icoSoldTokens < icoCap;
-    return !icoEnded && icoEnabled && withinPeriod && nonZeroPurchase && icoTokensAvailable;
+    return !icoEnded && icoEnabled && withinPeriod && icoTokensAvailable;
   }
 
   // end ico by owner, not really needed in normal situation
