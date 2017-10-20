@@ -1,4 +1,4 @@
-pragma solidity ^0.4.11;
+pragma solidity ^0.4.15;
 
 import './SLMToken.sol';
 import './math/SafeMath.sol';
@@ -7,12 +7,35 @@ import './TokenVesting.sol';
 
 /**
  * @title SLMICO
- * @dev SLMICO is a base contract for managing a token crowdsale.
+ * SLMICO is a base contract for managing a token crowdsale.
  * SLMICO have a start and end timestamps, where investors can make
  * token purchases and the crowdsale will assign them tokens based
  * on a token per ETH rate. Funds collected are forwarded to a wallet
  * as they arrive.
+ 
+ +MIT License
+ +
+ +Copyright (c) 2017 globaljobcoin
+ +
+ +Permission is hereby granted, free of charge, to any person obtaining a copy
+ +of this software and associated documentation files (the "Software"), to deal
+ +in the Software without restriction, including without limitation the rights
+ +to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ +copies of the Software, and to permit persons to whom the Software is
+ +furnished to do so, subject to the following conditions:
+ +
+ +The above copyright notice and this permission notice shall be included in all
+ +copies or substantial portions of the Software.
+ +
+ +THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ +IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ +FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ +AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ +LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ +OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ +SOFTWARE.
  */
+ 
 contract SLMICO is Pausable{
   using SafeMath for uint256;
 
@@ -25,6 +48,8 @@ contract SLMICO is Pausable{
 
   // The vesting contract
   TokenVesting public vesting;
+  uint256 constant public VESTING_TIMES = 4;
+  uint256 constant public DURATION_PER_VESTING = 56 weeks;
 
   // start and end timestamps where investments are allowed (both inclusive)
   uint256 public startTime;
@@ -67,9 +92,9 @@ contract SLMICO is Pausable{
   bool public icoEnded = false;
 
   //Sale rates
-  uint256 constant public RATE_FOR_DAY12 = 420;
-  uint256 constant public RATE_FOR_DAY34 = 385;
-  uint256 constant public RATE_FOR_DAY5 = 359;
+  uint256 constant public RATE_FOR_WEEK1 = 525;
+  uint256 constant public RATE_FOR_WEEK2 = 455;
+  uint256 constant public RATE_FOR_WEEK3 = 420;
   uint256 constant public RATE_NO_DISCOUNT = 350;
 
 
@@ -92,13 +117,13 @@ contract SLMICO is Pausable{
     token.transfer(multisignWallet, tokensToDao);
   }
 
-  function createVestingForFounder(address founderAddress) onlyOwner(){
+  function createVestingForFounder(address founderAddress) external onlyOwner(){
     require(founderAddress != address(0));
     //create only once
     require(address(vesting) == address(0));
     vesting = createTokenVestingContract(address(token));
-    // create vesting schema for founders, total token amount is divided in 4 periods of 6 months each
-    vesting.createVestingByDurationAndSplits(founderAddress, tokensForFounder, now.add(1 days), 26 weeks, 4);
+    // create vesting schema for founders from now, total token amount is divided in 4 periods of 6 months each
+    vesting.createVestingByDurationAndSplits(founderAddress, tokensForFounder, now, DURATION_PER_VESTING, VESTING_TIMES);
     //send tokens to vesting contracts
     token.transfer(address(vesting), tokensForFounder);
   }
@@ -116,18 +141,19 @@ contract SLMICO is Pausable{
   // creates the token to be sold.
   // override this method to have crowdsale of a specific mintable token.
   function createTokenVestingContract(address tokenAddress) internal returns (TokenVesting) {
+    require(address(token) != address(0));
     return new TokenVesting(tokenAddress);
   }
 
 
   // enable token tranferability
-  function enableTokenTransferability() onlyOwner {
+  function enableTokenTransferability() external onlyOwner {
     require(token != address(0));
     token.unpause(); 
   }
 
   // disable token tranferability
-  function disableTokenTransferability() onlyOwner {
+  function disableTokenTransferability() external onlyOwner {
     require(token != address(0));
     token.pause(); 
   }
@@ -140,7 +166,7 @@ contract SLMICO is Pausable{
   // set total pre sale sold token
   // can not be changed once the ico is enabled
   // Ico cap is determined by SaleCap + PreSaleCap - soldPreSaleTokens 
-  function setSoldPreSaleTokens(uint256 _soldPreSaleTokens) onlyOwner{
+  function setSoldPreSaleTokens(uint256 _soldPreSaleTokens) external onlyOwner{
     require(!icoEnabled);
     require(_soldPreSaleTokens <= preSaleCap);
     soldPreSaleTokens = _soldPreSaleTokens;
@@ -149,7 +175,7 @@ contract SLMICO is Pausable{
   // transfer pre sale tokend to investors
   // soldPreSaleTokens need to be set beforehand, and bigger than 0
   // the total amount to tranfered need to be less or equal to soldPreSaleTokens 
-  function transferPreSaleTokens(uint256 tokens, address beneficiary) onlyOwner {
+  function transferPreSaleTokens(uint256 tokens, address beneficiary) external onlyOwner {
     require(beneficiary != address(0));
     require(soldPreSaleTokens > 0);
     uint256 newSentPreSaleTokens = sentPreSaleTokens.add(tokens);
@@ -164,7 +190,7 @@ contract SLMICO is Pausable{
   //
 
   // set multisign wallet
-  function setMultisignWallet(address _multisignWallet) onlyOwner{
+  function setMultisignWallet(address _multisignWallet) external onlyOwner{
     // need to be set before the ico start
     require(!icoEnabled || now < startTime);
     require(_multisignWallet != address(0));
@@ -172,12 +198,12 @@ contract SLMICO is Pausable{
   }
 
   // delegate vesting contract owner
-  function delegateVestingContractOwner(address newOwner) onlyOwner{
+  function delegateVestingContractOwner(address newOwner) external onlyOwner{
     vesting.transferOwnership(newOwner);
   }
 
   // set contribution dates
-  function setContributionDates(uint256 _startTime, uint256 _endTime) onlyOwner{
+  function setContributionDates(uint256 _startTime, uint256 _endTime) external onlyOwner{
     require(!icoEnabled);
     require(_startTime >= now);
     require(_endTime >= _startTime);
@@ -185,11 +211,11 @@ contract SLMICO is Pausable{
     endTime = _endTime;
   }
 
-  // enable ICO, need to be true to start ico
-  // multisign wallet need to be set before ico starts
+  // enable ICO, need to be true to actually start ico
+  // multisign wallet need to be set, because once ico started, invested funds is transfered to this address
   // once ico is enabled, following parameters can not be changed anymore:
   // startTime, endTime, soldPreSaleTokens
-  function enableICO() onlyOwner{
+  function enableICO() external onlyOwner{
     require(startTime >= now);
 
     require(multisignWallet != address(0));
@@ -204,9 +230,8 @@ contract SLMICO is Pausable{
   }
 
   // low level token purchase function
-  function buyTokens(address beneficiary) payable whenNotPaused {
+  function buyTokens(address beneficiary) public payable whenNotPaused {
     require(beneficiary != address(0));
-    require(msg.value >= minContribAmount);
     require(validPurchase());
 
     uint256 weiAmount = msg.value;
@@ -258,13 +283,13 @@ contract SLMICO is Pausable{
   // @return true if the transaction can buy tokens
   function validPurchase() internal constant returns (bool) {
     bool withinPeriod = now >= startTime && now <= endTime;
-    bool nonZeroPurchase = msg.value > 0;
+    bool nonMinimumPurchase = msg.value >= minContribAmount;
     bool icoTokensAvailable = icoSoldTokens < icoCap;
-    return !icoEnded && icoEnabled && withinPeriod && nonZeroPurchase && icoTokensAvailable;
+    return !icoEnded && icoEnabled && withinPeriod && nonMinimumPurchase && icoTokensAvailable;
   }
 
   // end ico by owner, not really needed in normal situation
-  function endIco() onlyOwner {
+  function endIco() external onlyOwner {
     require(!icoEnded);
     icoEnded = true;
     // send unsold tokens to multi-sign wallet
@@ -280,25 +305,24 @@ contract SLMICO is Pausable{
 
   function getRate() public constant returns(uint){
     require(now >= startTime);
-    if (now < startTime.add(2 days)){
-      // day 1, day 2
-      return RATE_FOR_DAY12;
-    }else if (now < startTime.add(4 days)){
-      // day 3, day 4
-      return RATE_FOR_DAY34;
-    }else if (now < startTime.add(5 days)){
-      // day 5
-      return RATE_FOR_DAY5;
+    if (now < startTime.add(7 days)){
+      // Week 1
+      return RATE_FOR_WEEK1;
+    }else if (now < startTime.add(14 days)){
+      // Week 2
+      return RATE_FOR_WEEK2;
+    }else if (now < startTime.add(21 days)){
+      // Week 3
+      return RATE_FOR_WEEK3;
     }else if (now < endTime){
       // no discount
       return RATE_NO_DISCOUNT;
-      return 350;
     }
     return 0;
   }
 
   // drain all eth for owner in an emergency situation
-  function drain() onlyOwner {
+  function drain() external onlyOwner {
     owner.transfer(this.balance);
   }
 }
