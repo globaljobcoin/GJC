@@ -7,35 +7,12 @@ import './TokenVesting.sol';
 
 /**
  * @title SLMICO
- * SLMICO is a base contract for managing a token crowdsale.
+ * @dev SLMICO is a base contract for managing a token crowdsale.
  * SLMICO have a start and end timestamps, where investors can make
  * token purchases and the crowdsale will assign them tokens based
  * on a token per ETH rate. Funds collected are forwarded to a wallet
  * as they arrive.
- 
- +MIT License
- +
- +Copyright (c) 2017 globaljobcoin
- +
- +Permission is hereby granted, free of charge, to any person obtaining a copy
- +of this software and associated documentation files (the "Software"), to deal
- +in the Software without restriction, including without limitation the rights
- +to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- +copies of the Software, and to permit persons to whom the Software is
- +furnished to do so, subject to the following conditions:
- +
- +The above copyright notice and this permission notice shall be included in all
- +copies or substantial portions of the Software.
- +
- +THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- +IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- +FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- +AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- +LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- +OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- +SOFTWARE.
  */
- 
 contract SLMICO is Pausable{
   using SafeMath for uint256;
 
@@ -49,7 +26,7 @@ contract SLMICO is Pausable{
   // The vesting contract
   TokenVesting public vesting;
   uint256 constant public VESTING_TIMES = 4;
-  uint256 constant public DURATION_PER_VESTING = 56 weeks;
+  uint256 constant public DURATION_PER_VESTING = 52 weeks;
 
   // start and end timestamps where investments are allowed (both inclusive)
   uint256 public startTime;
@@ -122,7 +99,7 @@ contract SLMICO is Pausable{
     //create only once
     require(address(vesting) == address(0));
     vesting = createTokenVestingContract(address(token));
-    // create vesting schema for founders from now, total token amount is divided in 4 periods of 6 months each
+    // create vesting schema for founders from now, total token amount is divided in 4 periods of 12 months each
     vesting.createVestingByDurationAndSplits(founderAddress, tokensForFounder, now, DURATION_PER_VESTING, VESTING_TIMES);
     //send tokens to vesting contracts
     token.transfer(address(vesting), tokensForFounder);
@@ -263,13 +240,13 @@ contract SLMICO is Pausable{
 
     TokenPurchase(msg.sender, beneficiary, weiAmount, tokens);
 
-    forwardFunds(weiAmount);
+    forwardFunds();
   }
 
   // send ether to the fund collection wallet
   // override to create custom fund forwarding mechanisms
-  function forwardFunds(uint256 weiAmount) internal {
-    multisignWallet.transfer(weiAmount);
+  function forwardFunds() internal {
+    multisignWallet.transfer(this.balance);
   }
 
   // unsold ico tokens transfer automatically in endIco
@@ -305,14 +282,14 @@ contract SLMICO is Pausable{
 
   function getRate() public constant returns(uint){
     require(now >= startTime);
-    if (now < startTime.add(7 days)){
-      // Week 1
+    if (now < startTime.add(1 weeks)){
+      // week 1
       return RATE_FOR_WEEK1;
-    }else if (now < startTime.add(14 days)){
-      // Week 2
+    }else if (now < startTime.add(2 weeks)){
+      // week 2
       return RATE_FOR_WEEK2;
-    }else if (now < startTime.add(21 days)){
-      // Week 3
+    }else if (now < startTime.add(3 weeks)){
+      // week 3
       return RATE_FOR_WEEK3;
     }else if (now < endTime){
       // no discount
